@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Fanfic Browser</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f4ef;--bg2:#eee9e0;--bg3:#e4ddd2;--card:#fdfbf8;--border:#d6cfc4;--border2:#c4bdb2;
+  --text:#2a2420;--text2:#6b5f57;--text3:#9e948c;
+  --accent:#7c4f2f;--accent2:#a06840;--accent-bg:#f0e4d8;
+  --green:#3d6b4a;--green-bg:#e4f0e8;--red:#8b3a3a;--red-bg:#f5e4e4;
+  --tag-bg:#ede8e2;--tag-text:#5a4f47;
+  --radius:8px;--radius2:12px;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+h1,h2,h3{font-family:'Lora',serif}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:300px;min-width:300px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;position:sticky;top:0;overflow-y:auto}
+.main{flex:1;padding:24px;overflow:auto}
+.sidebar-header{padding:20px 18px 14px;border-bottom:1px solid var(--border)}
+.sidebar-header h1{font-size:20px;color:var(--accent);letter-spacing:-0.3px}
+.sidebar-header p{font-size:12px;color:var(--text3);margin-top:2px}
+.reset-all{margin:10px 18px 0;width:calc(100% - 36px);padding:7px;background:var(--accent-bg);color:var(--accent);border:1px solid var(--border2);border-radius:var(--radius);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;transition:background 0.15s}
+.reset-all:hover{background:#e8d6c8}
+.filter-section{border-bottom:1px solid var(--border);padding:14px 18px}
+.filter-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.filter-section-header h3{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3)}
+.section-actions{display:flex;gap:4px;align-items:center}
+.reset-section{font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);cursor:pointer;padding:2px 7px;border-radius:4px;font-family:'DM Sans',sans-serif;transition:color 0.15s}
+.reset-section:hover{color:var(--accent);border-color:var(--border2)}
+.toggle-arrow{font-size:10px;color:var(--text3);transition:transform 0.2s;background:none;border:none;cursor:pointer;padding:2px 4px}
+.filter-section.collapsed .toggle-arrow{transform:rotate(-90deg)}
+.filter-body{}
+.filter-section.collapsed .filter-body{display:none}
+.andor{display:flex;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;overflow:hidden;width:fit-content}
+.andor button{padding:3px 10px;font-size:11px;border:none;background:transparent;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:background 0.12s,color 0.12s}
+.andor button.active{background:var(--accent);color:#fff}
+.tag-cloud{display:flex;flex-wrap:wrap;gap:5px}
+.tag-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--tag-bg);color:var(--tag-text);user-select:none;transition:all 0.12s;line-height:1.4}
+.tag-pill:hover{border-color:var(--border2);background:var(--bg3)}
+.tag-pill.include{background:var(--green-bg);border-color:var(--green);color:var(--green)}
+.tag-pill.exclude{background:var(--red-bg);border-color:var(--red);color:var(--red)}
+.tag-pill .cnt{font-size:10px;opacity:0.65}
+.status-pill{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--tag-bg);color:var(--tag-text);user-select:none;transition:all 0.12s;gap:4px}
+.status-pill.active{background:var(--accent-bg);border-color:var(--accent2);color:var(--accent)}
+.fandom-list{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto}
+.fandom-item{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:6px;cursor:pointer;border:1px solid transparent;transition:all 0.12s;font-size:13px}
+.fandom-item:hover{background:var(--bg2);border-color:var(--border)}
+.fandom-item.include{background:var(--green-bg);border-color:var(--green);color:var(--green)}
+.fandom-item.exclude{background:var(--red-bg);border-color:var(--red);color:var(--red)}
+.fandom-item .fandom-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fandom-item .fandom-cnt{font-size:11px;color:var(--text3);margin-left:6px;flex-shrink:0}
+.fandom-item.include .fandom-cnt,.fandom-item.exclude .fandom-cnt{color:inherit;opacity:0.7}
+.fandom-item.special{font-style:italic;color:var(--text2)}
+.date-filter{display:flex;flex-direction:column;gap:8px}
+.date-row{display:flex;align-items:center;gap:6px}
+.date-direction{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.date-direction button{padding:4px 8px;font-size:11px;border:none;background:transparent;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif}
+.date-direction button.active{background:var(--accent);color:#fff}
+.date-picker-btn{display:flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text2);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;flex:1;transition:border-color 0.15s}
+.date-picker-btn:hover{border-color:var(--border2)}
+.date-picker-btn.has-date{color:var(--accent);border-color:var(--accent2);background:var(--accent-bg)}
+.keyword-input{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color 0.15s}
+.keyword-input:focus{border-color:var(--accent2)}
+.load-panel{background:var(--card);border:1px dashed var(--border2);border-radius:var(--radius2);padding:24px;max-width:560px;margin:40px auto}
+.load-panel h2{font-size:22px;color:var(--accent);margin-bottom:6px}
+.load-panel p{font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6}
+.tabs{display:flex;gap:4px;margin-bottom:14px}
+.tab-btn{padding:6px 14px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.12s}
+.tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+textarea.csv-input{width:100%;height:130px;font-size:11px;font-family:monospace;border:1px solid var(--border);border-radius:var(--radius);padding:8px;background:var(--bg);color:var(--text);resize:vertical;margin-bottom:8px;outline:none}
+.url-row{display:flex;gap:6px;margin-bottom:8px}
+.url-row input{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none}
+.btn-primary{padding:8px 18px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;transition:background 0.15s}
+.btn-primary:hover{background:var(--accent2)}
+.error-msg{color:var(--red);font-size:12px;margin-top:6px}
+.instructions{font-size:12px;color:var(--text3);line-height:1.7;margin-top:10px}
+.instructions code{background:var(--bg2);padding:1px 5px;border-radius:3px;font-family:monospace}
+.main-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:8px}
+.result-count{font-size:13px;color:var(--text3)}
+.result-count strong{color:var(--text);font-weight:500}
+.fic-grid{display:flex;flex-direction:column;gap:10px}
+.fic-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius2);padding:14px 16px;transition:box-shadow 0.15s}
+.fic-card:hover{box-shadow:0 2px 8px rgba(0,0,0,0.12)}
+.fic-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.fic-title{font-family:'Lora',serif;font-size:15px;color:var(--accent);text-decoration:none;font-weight:600;transition:color 0.15s}
+.fic-title:hover{color:var(--accent2);text-decoration:underline}
+.fic-fandoms{font-size:12px;color:var(--text3)}
+.fic-fandoms span{background:var(--bg2);padding:1px 7px;border-radius:10px;margin-left:4px}
+.fic-rating{margin-left:auto;font-size:12px;font-weight:500;padding:2px 9px;border-radius:10px;border:1px solid var(--border);color:var(--text2);background:var(--tag-bg);text-transform:lowercase;white-space:nowrap}
+.fic-desc{font-size:13px;color:var(--text2);margin:6px 0;line-height:1.55}
+.fic-bottom{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:8px}
+.fic-tag-pill{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--tag-bg);color:var(--tag-text);border:1px solid var(--border)}
+.fic-tag-pill.inc{background:var(--green-bg);color:var(--green);border-color:var(--green)}
+.fic-tag-pill.exc{background:var(--red-bg);color:var(--red);border-color:var(--red)}
+.details-btn{margin-left:auto;font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--text3);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.12s;white-space:nowrap}
+.details-btn:hover{background:var(--bg2);color:var(--text2)}
+.fic-details{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:none;grid-template-columns:1fr 1fr;gap:8px 16px}
+.fic-details.open{display:grid}
+.detail-label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);margin-bottom:3px}
+.detail-value{font-size:12px;color:var(--text2);line-height:1.5}
+.detail-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.detail-full{grid-column:1/-1}
+.empty-state{text-align:center;padding:48px 24px;color:var(--text3)}
+.empty-state h3{font-size:18px;margin-bottom:6px;color:var(--text2)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal-overlay.hidden{display:none}
+.cal-modal{background:var(--card);border:1px solid var(--border);border-radius:var(--radius2);padding:20px;box-shadow:0 8px 32px rgba(0,0,0,0.18);min-width:280px}
+.cal-modal h4{font-size:14px;font-family:'DM Sans';font-weight:500;margin-bottom:12px;color:var(--text)}
+.cal-modal input[type="date"]{display:block;width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;margin-bottom:12px;outline:none}
+.cal-actions{display:flex;gap:8px;justify-content:flex-end}
+.btn-sec{padding:6px 14px;border:1px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer}
+
+/* Rating colors - muted to match app style */
+.rp{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:12px;cursor:pointer;user-select:none;transition:all 0.12s;gap:4px;border:1px solid transparent}
+.rp:hover{filter:brightness(0.95)}
+.rp.neutral{background:var(--tag-bg);border-color:var(--border);color:var(--tag-text)}
+.rp.exclude{filter:brightness(0.85);opacity:0.7;text-decoration:line-through}
+
+.rp-awesome{background:#d4e8d4;border-color:#4a8a5a;color:#2d5c38}
+.rp-great{background:#d8e8cc;border-color:#5a8a40;color:#345c22}
+.rp-good{background:#dce8c4;border-color:#6a8a38;color:#3d5c1a}
+.rp-decent{background:#e8e4c4;border-color:#8a7a38;color:#5c4e1a}
+.rp-uninteresting{background:#e0ddd8;border-color:#8a8680;color:#4a4844}
+.rp-guilty{background:#ddd4e8;border-color:#7a60a8;color:#4a3470}
+.rp-failure{background:#e8c8c8;border-color:#a04040;color:#6c2222}
+.rp-trash{background:#e8c0c0;border-color:#a83030;color:#721818}
+.rp-kill{background:#3a2855;border-color:#5a4488;color:#ccc0e8}
+.rp-bite{background:#c8d8e8;border-color:#4870a0;color:#1c3d60}
+.rp-pleasure{background:#e8c8d8;border-color:#a04878;color:#6c1e48}
+.rp-dash{background:#e8e8e8;border-color:#a0a0a0;color:#505050}
+
+.rp-awesome.active,.rp-great.active,.rp-good.active,.rp-decent.active,.rp-uninteresting.active,.rp-guilty.active,.rp-failure.active,.rp-trash.active,.rp-kill.active,.rp-bite.active,.rp-pleasure.active,.rp-dash.active{box-shadow:0 0 0 2px currentColor}
+
+/* fic card rating badges */
+.rb{font-size:12px;font-weight:500;padding:2px 9px;border-radius:10px;white-space:nowrap;margin-left:auto}
+.rb-awesome{background:#d4e8d4;color:#2d5c38;border:1px solid #4a8a5a}
+.rb-great{background:#d8e8cc;color:#345c22;border:1px solid #5a8a40}
+.rb-good{background:#dce8c4;color:#3d5c1a;border:1px solid #6a8a38}
+.rb-decent{background:#e8e4c4;color:#5c4e1a;border:1px solid #8a7a38}
+.rb-uninteresting{background:#e0ddd8;color:#4a4844;border:1px solid #8a8680}
+.rb-guilty{background:#ddd4e8;color:#4a3470;border:1px solid #7a60a8}
+.rb-failure{background:#e8c8c8;color:#6c2222;border:1px solid #a04040}
+.rb-trash{background:#e8c0c0;color:#721818;border:1px solid #a83030}
+.rb-kill{background:#3a2855;color:#ccc0e8;border:1px solid #5a4488}
+.rb-bite{background:#c8d8e8;color:#1c3d60;border:1px solid #4870a0}
+.rb-pleasure{background:#e8c8d8;color:#6c1e48;border:1px solid #a04878}
+.rb-dash{background:#e8e8e8;color:#505050;border:1px solid #a0a0a0}
+</style>
+</head>
+<body>
+
+<div class="modal-overlay hidden" id="cal-overlay">
+  <div class="cal-modal">
+    <h4 id="cal-title">Select date</h4>
+    <input type="date" id="cal-input"/>
+    <div class="cal-actions">
+      <button class="btn-sec" onclick="closeCal(true)">Clear</button>
+      <button class="btn-sec" onclick="closeCal(false)">Cancel</button>
+      <button class="btn-primary" onclick="confirmCal()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<div class="layout" id="app-layout" style="display:none">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>Fanfic Browser</h1>
+      <p id="sidebar-sub">Browse and filter your reading list</p>
+    </div>
+    <button class="reset-all" onclick="resetAll()">↺ Reset all filters</button>
+
+    <!-- Fandom -->
+    <div class="filter-section" id="sec-fandom">
+      <div class="filter-section-header">
+        <h3>Fandom</h3>
+        <div class="section-actions">
+          <button class="reset-section" onclick="resetFandom()">reset</button>
+          <button class="toggle-arrow" onclick="toggleSection('fandom')">▼</button>
+        </div>
+      </div>
+      <div class="filter-body">
+        <div class="andor" style="margin-bottom:8px">
+          <button id="fandom-or" class="active" onclick="setFandomMode('or')">OR</button>
+          <button id="fandom-and" onclick="setFandomMode('and')">AND</button>
+        </div>
+        <div class="fandom-list" id="fandom-list"></div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="filter-section" id="sec-status">
+      <div class="filter-section-header">
+        <h3>Status</h3>
+        <div class="section-actions">
+          <button class="reset-section" onclick="resetStatus()">reset</button>
+          <button class="toggle-arrow" onclick="toggleSection('status')">▼</button>
+        </div>
+      </div>
+      <div class="filter-body">
+        <div class="tag-cloud" id="status-list"></div>
+      </div>
+    </div>
+
+    <!-- Rating -->
+    <div class="filter-section" id="sec-rating">
+      <div class="filter-section-header">
+        <h3>Rating</h3>
+        <div class="section-actions">
+          <button class="reset-section" onclick="resetRating()">reset</button>
+          <button class="toggle-arrow" onclick="toggleSection('rating')">▼</button>
+        </div>
+      </div>
+      <div class="filter-body">
+        <div class="tag-cloud" id="rating-list"></div>
+      </div>
+    </div>
+
+    <!-- Fic Tags -->
+    <div class="filter-section" id="sec-fic">
+      <div class="filter-section-header">
+        <h3>Fic Tags</h3>
+        <div class="section-actions">
+          <button class="reset-section" onclick="resetFic()">reset</button>
+          <button class="toggle-arrow" onclick="toggleSection('fic')">▼</button>
+        </div>
+      </div>
+      <div class="filter-body">
+        <div class="andor" style="margin-bottom:8px">
+          <button id="fic-or" class="active" onclick="setFicMode('or')">OR</button>
+          <button id="fic-and" onclick="setFicMode('and')">AND</button>
+        </div>
+        <div class="tag-cloud" id="fic-tag-list"></div>
+      </div>
+    </div>
+
+    <!-- MC Tags -->
+    <div class="filter-section" id="sec-mc">
+      <div class="filter-section-header">
+        <h3>MC Tags</h3>
+        <div class="section-actions">
+          <button class="reset-section" onclick="resetMC()">reset</button>
+          <button class="toggle-arrow" onclick="toggleSection('mc')">▼</button>
+        </div>
+      </div>
+      <div class="filter-body">
+        <div class="andor" style="margin-bottom:8px">
+          <button id="mc-or" class="active" onclick="setMCMode('or')">OR</button>
+          <button id="mc-and" onclick="setMCMode('and')">AND</button>
+        </div>
+        <div class="tag-cloud" id="mc-tag-list"></div>
+      </div>
+    </div>
+
+    <!-- Date -->
+    <div class="filter-section" id="sec-date">
+      <div class="filter-section-header">
+        <h3>Date read</h3>
+        <div class="section-actions">
+          <button class="reset-section" onclick="resetDate()">reset</button>
+          <button class="toggle-arrow" onclick="toggleSection('date')">▼</button>
+        </div>
+      </div>
+      <div class="filter-body date-filter">
+        <div class="date-row">
+          <div class="date-direction">
+            <button id="d1-after" class="active" onclick="setDateDir(1,'after')">After</button>
+            <button id="d1-before" onclick="setDateDir(1,'before')">Before</button>
+          </div>
+          <button class="date-picker-btn" id="date1-btn" onclick="openCal(1)">📅 Pick date</button>
+        </div>
+        <div class="date-row">
+          <div class="date-direction">
+            <button id="d2-after" class="active" onclick="setDateDir(2,'after')">After</button>
+            <button id="d2-before" onclick="setDateDir(2,'before')">Before</button>
+          </div>
+          <button class="date-picker-btn" id="date2-btn" onclick="openCal(2)">📅 Pick date</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Description -->
+    <div class="filter-section" id="sec-desc">
+      <div class="filter-section-header">
+        <h3>Description keyword</h3>
+        <div class="section-actions">
+          <button class="reset-section" onclick="resetDesc()">reset</button>
+          <button class="toggle-arrow" onclick="toggleSection('desc')">▼</button>
+        </div>
+      </div>
+      <div class="filter-body">
+        <input class="keyword-input" type="search" id="desc-search" placeholder="Search descriptions…" oninput="render()"/>
+      </div>
+    </div>
+
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
+      <button class="reset-all" style="margin:0;width:100%" onclick="showLoad()">↑ Load new data</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <span class="result-count" id="result-count"></span>
+    </div>
+    <div class="fic-grid" id="fic-grid"></div>
+  </main>
+</div>
+
+<div id="load-panel">
+  <div class="load-panel">
+    <h2>Fanfic Browser</h2>
+    <p>Required columns: <code>title</code>, <code>fandom1</code>, <code>fandom2</code>, <code>status</code>, <code>description</code>, <code>link</code>, <code>lastchap</code>, <code>words read</code>, <code>date</code>, <code>fic tags</code>, <code>mc tags</code>, <code>rating</code>. Tags comma-separated within cells.</p>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('csv')">Paste CSV</button>
+      <button class="tab-btn" onclick="switchTab('url')">Google Sheet URL</button>
+      <button class="tab-btn" onclick="switchTab('demo')">Demo data</button>
+    </div>
+    <div id="tab-csv">
+      <textarea class="csv-input" id="csv-input" placeholder="Paste your CSV or TSV here…"></textarea>
+      <button class="btn-primary" onclick="loadCSV()">Load</button>
+      <div class="error-msg" id="csv-err"></div>
+    </div>
+    <div id="tab-url" style="display:none">
+      <div class="url-row">
+        <input type="text" id="sheet-url" placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"/>
+        <button class="btn-primary" onclick="loadURL()">Fetch</button>
+      </div>
+      <div class="error-msg" id="url-err"></div>
+      <div class="instructions">File → Share → Publish to web → choose sheet tab → CSV → Publish → copy URL.</div>
+    </div>
+    <div id="tab-demo" style="display:none">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Load sample data to explore the interface.</p>
+      <button class="btn-primary" onclick="loadDemo()">Load demo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEMO_CSV = `title,fandom1,fandom2,status,description,link,lastchap,words read,date,fic tags,mc tags,rating
+A Little Wake-up Call,Worm,,Completed,"A girl wakes up ten years in the past and tries to fix everything.",https://example.com,45,85000,2023-06-12,">200k, angst, time-travel","adorable, determined",awesome
+Way of the Ninja,Naruto,,Completed,"She trained for years and finally gets her revenge.",https://example.com,80,120000,2023-09-01,">200k, romance(significant), F/F","badass, ruthless",great
+Hellions,Worm,,Completed,"Chaos incarnate meets an even more chaotic group.",https://example.com,31,81000,2026-05-25,"funny, found-family","funny, chaotic",great
+Trials of Change,Worm,,Return,"A slow and painful arc of healing.",https://example.com,12,35000,2026-05-27,"angst, romance(some), F/M","angsty, emotional",good
+Iron Will,Worm,,Dropped,"No-nonsense MC grinds her way to the top.",https://example.com,60,175000,2023-03-22,">200k, quest","badass, overpowered",decent`;
+
+const RATING_ORDER = ['awesome','great','good','decent','uninteresting','guilty','failure','trash','kill the author','bite','pleasure','-'];
+const RATING_KEY = r => { const i = RATING_ORDER.indexOf(r.toLowerCase()); return i === -1 ? 99 : i; };
+const RATING_CLASS = r => {
+  const map = {'awesome':'awesome','great':'great','good':'good','decent':'decent','uninteresting':'uninteresting','guilty':'guilty','failure':'failure','trash':'trash','kill the author':'kill','bite':'bite','pleasure':'pleasure','-':'dash'};
+  return map[r.toLowerCase()] || 'dash';
+};
+
+const PRIORITY_FANDOMS = ['Worm','Naruto','BNHA'];
+
+let fics = [], tagOrderFic = [], tagOrderMC = [];
+let fandomStates = {}, fandomMode = 'or';
+let statusActive = new Set();
+let ratingStates = {};
+let mcStates = {}, mcMode = 'or';
+let ficStates = {}, ficMode = 'or';
+let date1 = {dir:'after',val:null}, date2 = {dir:'after',val:null};
+let calTarget = null;
+
+function switchTab(t) {
+  ['csv','url','demo'].forEach(x => { document.getElementById('tab-'+x).style.display = x===t?'':'none'; });
+  document.querySelectorAll('.tab-btn').forEach((b,i) => { b.classList.toggle('active',['csv','url','demo'][i]===t); });
+}
+
+function normalizeKey(s) { return s.toLowerCase().replace(/[\s_]+/g,''); }
+
+function parseCSV(txt) {
+  const r = Papa.parse(txt.trim(), {header:true, skipEmptyLines:true, delimiter:'', newline:''});
+  if (!r.data.length) throw new Error('No data found.');
+  const colMap = {};
+  Object.keys(r.data[0]).forEach(k => { colMap[normalizeKey(k)] = k; });
+  const get = (row, key) => {
+    const orig = colMap[normalizeKey(key)];
+    return orig ? (row[orig]||'').trim() : '';
+  };
+  if (!colMap['title']) throw new Error('Missing column: title');
+  fics = r.data.map(row => ({
+    title: get(row,'title'),
+    fandom1: get(row,'fandom1'),
+    fandom2: get(row,'fandom2'),
+    status: get(row,'status'),
+    description: get(row,'description'),
+    link: get(row,'link'),
+    lastchap: get(row,'lastchap'),
+    words: get(row,'wordsread') || get(row,'words'),
+    date: get(row,'date'),
+    fictags: parseTags(get(row,'fictags') || get(row,'fic tags')),
+    mctags: parseTags(get(row,'mctags') || get(row,'mc tags')),
+    rating: get(row,'rating').toLowerCase(),
+  })).filter(f => f.title);
+  if (!fics.length) throw new Error('No valid rows found.');
+
+  // collect tag order from sheet column order (preserve first-seen order)
+  const ficTagsSeen = [], mcTagsSeen = [];
+  const ficSet = new Set(), mcSet = new Set();
+  fics.forEach(f => {
+    f.fictags.forEach(t => { if (!ficSet.has(t)) { ficSet.add(t); ficTagsSeen.push(t); }});
+    f.mctags.forEach(t => { if (!mcSet.has(t)) { mcSet.add(t); mcTagsSeen.push(t); }});
+  });
+  tagOrderFic = ficTagsSeen;
+  tagOrderMC = mcTagsSeen;
+}
+
+function parseTags(s) {
+  return s.split(',').map(t=>t.trim().toLowerCase()).filter(Boolean);
+}
+
+function loadCSV() {
+  const err = document.getElementById('csv-err');
+  try { parseCSV(document.getElementById('csv-input').value); err.textContent=''; init(); }
+  catch(e) { err.textContent=e.message; }
+}
+
+async function loadURL() {
+  const err = document.getElementById('url-err');
+  const url = document.getElementById('sheet-url').value.trim();
+  err.textContent='Fetching…';
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Could not fetch. Make sure the sheet is published as CSV.');
+    parseCSV(await res.text()); err.textContent=''; init();
+  } catch(e) { err.textContent=e.message; }
+}
+
+function loadDemo() { parseCSV(DEMO_CSV); init(); }
+function showLoad() { document.getElementById('load-panel').style.display=''; document.getElementById('app-layout').style.display='none'; }
+
+function init() {
+  fandomStates={}; statusActive=new Set(); ratingStates={};
+  mcStates={}; ficStates={};
+  date1={dir:'after',val:null}; date2={dir:'after',val:null};
+  buildSidebar();
+  document.getElementById('load-panel').style.display='none';
+  document.getElementById('app-layout').style.display='flex';
+  render();
+}
+
+function fandomCount() {
+  const cnt = {};
+  fics.forEach(f => {
+    if (f.fandom1) cnt[f.fandom1]=(cnt[f.fandom1]||0)+1;
+    if (f.fandom2) cnt[f.fandom2]=(cnt[f.fandom2]||0)+1;
+  });
+  return cnt;
+}
+
+function sortedFandoms() {
+  const cnt = fandomCount();
+  const all = Object.keys(cnt);
+  const priority = PRIORITY_FANDOMS.filter(f => all.includes(f));
+  const rest = all.filter(f => !PRIORITY_FANDOMS.includes(f)).sort((a,b) => a.localeCompare(b));
+  return [...priority, ...rest];
+}
+
+function buildSidebar() {
+  const fl = document.getElementById('fandom-list');
+  fl.innerHTML = '';
+  const cnt = fandomCount();
+
+  // "+ any crossover" special item
+  const anyEl = document.createElement('div');
+  anyEl.className = 'fandom-item special';
+  anyEl.dataset.f = '__any__';
+  anyEl.innerHTML = `<span class="fandom-name">+ any (crossover)</span>`;
+  anyEl.onclick = () => cycleFandom('__any__');
+  fl.appendChild(anyEl);
+
+  sortedFandoms().forEach(f => {
+    const el = document.createElement('div');
+    el.className = 'fandom-item';
+    el.dataset.f = f;
+    el.innerHTML = `<span class="fandom-name">${f}</span><span class="fandom-cnt">${cnt[f]}</span>`;
+    el.onclick = () => cycleFandom(f);
+    fl.appendChild(el);
+  });
+
+  // Status
+  const sl = document.getElementById('status-list');
+  sl.innerHTML = '';
+  const statusCnt = {};
+  fics.forEach(f => { if(f.status) statusCnt[f.status]=(statusCnt[f.status]||0)+1; });
+  Object.entries(statusCnt).sort((a,b)=>b[1]-a[1]).forEach(([s,c]) => {
+    const el = document.createElement('span');
+    el.className='status-pill'; el.dataset.s=s;
+    el.innerHTML=`${s} <span class="cnt">${c}</span>`;
+    el.onclick=()=>toggleStatus(s);
+    sl.appendChild(el);
+  });
+
+  // Rating
+  buildRatingList();
+
+  // Fic tags - ordered by tagOrderFic
+  buildTagCloud('fic-tag-list', tagOrderFic, ficStates, cycleFic);
+  // MC tags
+  buildTagCloud('mc-tag-list', tagOrderMC, mcStates, cycleMC);
+}
+
+function buildRatingList() {
+  const rl = document.getElementById('rating-list');
+  rl.innerHTML = '';
+  const ratingCnt = {};
+  fics.forEach(f => { if(f.rating) ratingCnt[f.rating]=(ratingCnt[f.rating]||0)+1; });
+
+  RATING_ORDER.forEach(r => {
+    if (!ratingCnt[r]) return;
+    const cls = RATING_CLASS(r);
+    const el = document.createElement('span');
+    el.className = `rp rp-${cls} neutral`;
+    el.dataset.r = r;
+    el.innerHTML = `${r} <span class="cnt" style="opacity:0.65;font-size:10px">${ratingCnt[r]}</span>`;
+    el.onclick = () => cycleRating(r);
+    rl.appendChild(el);
+  });
+}
+
+function buildTagCloud(elId, orderedTags, states, cycleFn) {
+  const el = document.getElementById(elId);
+  el.innerHTML = '';
+  // count
+  const cnt = {};
+  fics.forEach(f => {
+    const field = (elId === 'fic-tag-list') ? f.fictags : f.mctags;
+    field.forEach(t => { cnt[t]=(cnt[t]||0)+1; });
+  });
+  orderedTags.forEach(t => {
+    if (!cnt[t]) return;
+    const pill = document.createElement('span');
+    pill.className='tag-pill '+(states[t]||'');
+    pill.dataset.t=t;
+    pill.innerHTML=`${t} <span class="cnt">${cnt[t]}</span>`;
+    pill.onclick=()=>cycleFn(t);
+    el.appendChild(pill);
+  });
+}
+
+function cycleFandom(f) {
+  const s = fandomStates[f]||'neutral';
+  fandomStates[f] = s==='neutral'?'include':s==='include'?'exclude':'neutral';
+  document.querySelectorAll('#fandom-list .fandom-item').forEach(el => {
+    if (el.dataset.f===f) {
+      const state = fandomStates[f];
+      el.className = 'fandom-item' + (f==='__any__'?' special':'') + (state!=='neutral'?' '+state:'');
+    }
+  });
+  render();
+}
+
+function toggleStatus(s) {
+  if (statusActive.has(s)) statusActive.delete(s); else statusActive.add(s);
+  document.querySelectorAll('#status-list .status-pill').forEach(el => {
+    if (el.dataset.s===s) el.classList.toggle('active', statusActive.has(s));
+  });
+  render();
+}
+
+function cycleRating(r) {
+  const s = ratingStates[r]||'neutral';
+  ratingStates[r] = s==='neutral'?'include':s==='include'?'exclude':'neutral';
+  document.querySelectorAll('#rating-list .rp').forEach(el => {
+    if (el.dataset.r===r) {
+      const cls = RATING_CLASS(r);
+      el.className = `rp rp-${cls}`;
+      if (ratingStates[r]==='include') el.classList.add('active');
+      else if (ratingStates[r]==='exclude') el.classList.add('exclude');
+      else el.classList.add('neutral');
+    }
+  });
+  render();
+}
+
+function cycleMC(t) {
+  const s = mcStates[t]||'neutral';
+  mcStates[t] = s==='neutral'?'include':s==='include'?'exclude':'neutral';
+  document.querySelectorAll('#mc-tag-list .tag-pill').forEach(el => {
+    if (el.dataset.t===t) el.className='tag-pill '+(mcStates[t]!=='neutral'?mcStates[t]:'');
+  });
+  render();
+}
+
+function cycleFic(t) {
+  const s = ficStates[t]||'neutral';
+  ficStates[t] = s==='neutral'?'include':s==='include'?'exclude':'neutral';
+  document.querySelectorAll('#fic-tag-list .tag-pill').forEach(el => {
+    if (el.dataset.t===t) el.className='tag-pill '+(ficStates[t]!=='neutral'?ficStates[t]:'');
+  });
+  render();
+}
+
+function setFandomMode(m) { fandomMode=m; document.getElementById('fandom-or').classList.toggle('active',m==='or'); document.getElementById('fandom-and').classList.toggle('active',m==='and'); render(); }
+function setMCMode(m) { mcMode=m; document.getElementById('mc-or').classList.toggle('active',m==='or'); document.getElementById('mc-and').classList.toggle('active',m==='and'); render(); }
+function setFicMode(m) { ficMode=m; document.getElementById('fic-or').classList.toggle('active',m==='or'); document.getElementById('fic-and').classList.toggle('active',m==='and'); render(); }
+
+function setDateDir(n, dir) {
+  if (n===1) { date1.dir=dir; document.getElementById('d1-after').classList.toggle('active',dir==='after'); document.getElementById('d1-before').classList.toggle('active',dir==='before'); }
+  else { date2.dir=dir; document.getElementById('d2-after').classList.toggle('active',dir==='after'); document.getElementById('d2-before').classList.toggle('active',dir==='before'); }
+  render();
+}
+
+function openCal(n) {
+  calTarget=n;
+  const val = n===1?date1.val:date2.val;
+  document.getElementById('cal-input').value=val||'';
+  document.getElementById('cal-title').textContent=(n===1?date1.dir:date2.dir)==='after'?'Read after…':'Read before…';
+  document.getElementById('cal-overlay').classList.remove('hidden');
+}
+function closeCal(clear) {
+  if (clear) { if(calTarget===1){date1.val=null;updateDateBtn(1);}else{date2.val=null;updateDateBtn(2);} render(); }
+  document.getElementById('cal-overlay').classList.add('hidden');
+}
+function confirmCal() {
+  const v=document.getElementById('cal-input').value;
+  if(calTarget===1){date1.val=v||null;updateDateBtn(1);}else{date2.val=v||null;updateDateBtn(2);}
+  document.getElementById('cal-overlay').classList.add('hidden');
+  render();
+}
+function updateDateBtn(n) {
+  const btn=document.getElementById('date'+n+'-btn');
+  const d=n===1?date1:date2;
+  if(d.val){btn.textContent=(d.dir==='after'?'After: ':'Before: ')+d.val;btn.classList.add('has-date');}
+  else{btn.textContent='📅 Pick date';btn.classList.remove('has-date');}
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  const p=s.split('.');
+  if (p.length===3&&p[0].length<=2) return new Date(`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`);
+  return new Date(s);
+}
+
+function applyDateFilter(fic) {
+  const fd=parseDate(fic.date);
+  for (const d of [date1,date2]) {
+    if (!d.val) continue;
+    const ref=new Date(d.val);
+    if (isNaN(ref)) continue;
+    if (!fd) return false;
+    if (d.dir==='after'&&fd<ref) return false;
+    if (d.dir==='before'&&fd>ref) return false;
+  }
+  return true;
+}
+
+function applyTagFilter(ficTags, states, mode) {
+  const inc=Object.entries(states).filter(([,v])=>v==='include').map(([k])=>k);
+  const exc=Object.entries(states).filter(([,v])=>v==='exclude').map(([k])=>k);
+  if (exc.some(t=>ficTags.includes(t))) return false;
+  if (!inc.length) return true;
+  if (mode==='and') return inc.every(t=>ficTags.includes(t));
+  return inc.some(t=>ficTags.includes(t));
+}
+
+function applyFandomFilter(fic) {
+  const ficFandoms=[fic.fandom1,fic.fandom2].filter(Boolean);
+  const anyActive = fandomStates['__any__'];
+  const inc=Object.entries(fandomStates).filter(([k,v])=>v==='include'&&k!=='__any__').map(([k])=>k);
+  const exc=Object.entries(fandomStates).filter(([k,v])=>v==='exclude'&&k!=='__any__').map(([k])=>k);
+
+  if (exc.some(f=>ficFandoms.includes(f))) return false;
+
+  if (anyActive==='include') {
+    // must have at least 2 fandoms AND satisfy other inc filters
+    if (ficFandoms.length < 2) return false;
+    if (inc.length) {
+      if (fandomMode==='and') return inc.every(f=>ficFandoms.includes(f));
+      return inc.some(f=>ficFandoms.includes(f));
+    }
+    return true;
+  }
+  if (anyActive==='exclude') {
+    if (ficFandoms.length >= 2) return false;
+  }
+
+  if (!inc.length) return true;
+  if (fandomMode==='and') return inc.every(f=>ficFandoms.includes(f));
+  return inc.some(f=>ficFandoms.includes(f));
+}
+
+function applyRatingFilter(fic) {
+  const inc=Object.entries(ratingStates).filter(([,v])=>v==='include').map(([k])=>k);
+  const exc=Object.entries(ratingStates).filter(([,v])=>v==='exclude').map(([k])=>k);
+  if (exc.includes(fic.rating)) return false;
+  if (!inc.length) return true;
+  return inc.includes(fic.rating);
+}
+
+function render() {
+  const q=(document.getElementById('desc-search').value||'').toLowerCase();
+  const filtered=fics.filter(f => {
+    if (!applyFandomFilter(f)) return false;
+    if (statusActive.size&&!statusActive.has(f.status)) return false;
+    if (!applyRatingFilter(f)) return false;
+    if (!applyTagFilter(f.fictags,ficStates,ficMode)) return false;
+    if (!applyTagFilter(f.mctags,mcStates,mcMode)) return false;
+    if (!applyDateFilter(f)) return false;
+    if (q&&!f.description.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  document.getElementById('result-count').innerHTML=`<strong>${filtered.length}</strong> of ${fics.length} fics`;
+
+  const grid=document.getElementById('fic-grid');
+  if (!filtered.length) { grid.innerHTML='<div class="empty-state"><h3>No fics match</h3><p>Try relaxing some filters</p></div>'; return; }
+
+  const ficInc=Object.entries(ficStates).filter(([,v])=>v==='include').map(([k])=>k);
+  const ficExc=Object.entries(ficStates).filter(([,v])=>v==='exclude').map(([k])=>k);
+  const mcInc=Object.entries(mcStates).filter(([,v])=>v==='include').map(([k])=>k);
+  const mcExc=Object.entries(mcStates).filter(([,v])=>v==='exclude').map(([k])=>k);
+
+  grid.innerHTML=filtered.map((f,i) => {
+    const fandoms=[f.fandom1,f.fandom2].filter(Boolean).map(fd=>`<span>${fd}</span>`).join('');
+    const rcls = f.rating ? `rb rb-${RATING_CLASS(f.rating)}` : 'rb';
+    const titleEl=f.link
+      ?`<a class="fic-title" href="${f.link}" target="_blank" rel="noopener">${f.title}</a>`
+      :`<span class="fic-title" style="cursor:default">${f.title}</span>`;
+
+    const ficTagsHtml=f.fictags.map(t=>{
+      const cls=ficInc.includes(t)?'inc':ficExc.includes(t)?'exc':'';
+      return `<span class="fic-tag-pill ${cls}">${t}</span>`;
+    }).join('');
+    const mcTagsHtml=f.mctags.map(t=>{
+      const cls=mcInc.includes(t)?'inc':mcExc.includes(t)?'exc':'';
+      return `<span class="fic-tag-pill ${cls}">${t}</span>`;
+    }).join('');
+
+    return `<div class="fic-card">
+      <div class="fic-top">
+        ${titleEl}
+        <span class="fic-fandoms">${fandoms}</span>
+        ${f.rating?`<span class="${rcls}">${f.rating}</span>`:''}
+      </div>
+      ${f.description?`<div class="fic-desc">${f.description}</div>`:''}
+      <div class="fic-bottom">
+        ${ficTagsHtml}${mcTagsHtml}
+        <button class="details-btn" onclick="toggleDetails(this)">more details ▾</button>
+      </div>
+      <div class="fic-details" id="det-${i}">
+        ${f.status?`<div class="detail-group"><div class="detail-label">Status</div><div class="detail-value">${f.status}</div></div>`:''}
+        ${f.date?`<div class="detail-group"><div class="detail-label">Date read</div><div class="detail-value">${f.date}</div></div>`:''}
+        ${f.words?`<div class="detail-group"><div class="detail-label">Words read</div><div class="detail-value">${parseInt(f.words).toLocaleString()}</div></div>`:''}
+        ${f.lastchap?`<div class="detail-group"><div class="detail-label">Last chapter</div><div class="detail-value">${f.lastchap}</div></div>`:''}
+        ${f.fictags.length?`<div class="detail-group detail-full"><div class="detail-label">Fic tags</div><div class="detail-tags">${ficTagsHtml}</div></div>`:''}
+        ${f.mctags.length?`<div class="detail-group detail-full"><div class="detail-label">MC tags</div><div class="detail-tags">${mcTagsHtml}</div></div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleDetails(btn) {
+  const det=btn.closest('.fic-card').querySelector('.fic-details');
+  const open=det.classList.toggle('open');
+  btn.textContent=open?'less details ▴':'more details ▾';
+}
+
+function toggleSection(id) { document.getElementById('sec-'+id).classList.toggle('collapsed'); }
+
+function resetFandom() { fandomStates={}; document.querySelectorAll('#fandom-list .fandom-item').forEach(el=>{ el.className='fandom-item'+(el.dataset.f==='__any__'?' special':''); }); render(); }
+function resetStatus() { statusActive=new Set(); document.querySelectorAll('#status-list .status-pill').forEach(el=>el.classList.remove('active')); render(); }
+function resetRating() { ratingStates={}; document.querySelectorAll('#rating-list .rp').forEach(el=>{ const r=el.dataset.r; const cls=RATING_CLASS(r); el.className=`rp rp-${cls} neutral`; }); render(); }
+function resetMC() { mcStates={}; document.querySelectorAll('#mc-tag-list .tag-pill').forEach(el=>el.className='tag-pill'); render(); }
+function resetFic() { ficStates={}; document.querySelectorAll('#fic-tag-list .tag-pill').forEach(el=>el.className='tag-pill'); render(); }
+function resetDate() { date1={dir:'after',val:null}; date2={dir:'after',val:null}; updateDateBtn(1); updateDateBtn(2); render(); }
+function resetDesc() { document.getElementById('desc-search').value=''; render(); }
+function resetAll() { resetFandom();resetStatus();resetRating();resetMC();resetFic();resetDate();resetDesc(); }
+
+document.getElementById('cal-overlay').onclick=function(e){ if(e.target===this) closeCal(false); };
+</script>
+</body>
+</html>
